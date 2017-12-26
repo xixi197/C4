@@ -53,125 +53,84 @@ int eval() {
     while (1) {
         op = *pc++;
 
-        switch (op) {
-            case IMM:
-                ax = *pc++;
-                break;
-            case LI:
-                ax = *(int *) ax;
-                break;
-            case LC:
-                ax = *(char *) ax;
-                break;
-            case SI:
-                *(int *) *sp++ = ax;
-                break;
-            case SC:
-                *(char *) *sp++ = (char) ax;
-                break;
-            case PUSH:
-                *--sp = ax;
-                break;
-            case JMP:
-                pc = (int *) *pc;
-                break;
-            case JZ:
-                pc = ax ? pc + 1 : (int *) *pc;
-                break;
-            case JNZ:
-                pc = ax ? (int *) *pc : pc + 1;
-                break;
-
-            case CALL:
-                *--sp = (int) (pc + 1);
-                pc = (int *) *pc;
-                break;
-            case ENT:
-                *--sp = (int) bp;
-                bp = sp;
-                sp -= *pc++;
-                break;
-            case LEV:
-                sp = bp;
-                bp = (int *) *sp++;
-                pc = (int *) *sp++;
-                break;
-            case ADJ:
-                sp += *pc++;
-                break;
-            case LEA:
-                ax = (int) (bp + *pc++);
-                break;
-
-            case XOR:
-                ax = *sp++ ^ ax;
-                break;
-            case OR:
-                ax = *sp++ | ax;
-                break;
-            case AND:
-                ax = *sp++ & ax;
-                break;
-            case EQ:
-                ax = *sp++ == ax;
-                break;
-            case NE:
-                ax = *sp++ != ax;
-                break;
-            case LT:
-                ax = *sp++ < ax;
-                break;
-            case LE:
-                ax = *sp++ <= ax;
-                break;
-            case GT:
-                ax = *sp++ > ax;
-                break;
-            case GE:
-                ax = *sp++ >= ax;
-                break;
-
-            case SHL:
-                ax = *sp++ << ax;
-                break;
-            case SHR:
-                ax = *sp++ >> ax;
-                break;
-            case ADD:
-                ax = *sp++ + ax;
-                break;
-            case SUB:
-                ax = *sp++ - ax;
-                break;
-            case MUL:
-                ax = *sp++ * ax;
-                break;
-            case DIV:
-                ax = *sp++ / ax;
-                break;
-            case MOD:
-                ax = *sp++ % ax;
-                break;
-            case EXIT:
-                printf("exit %d", *sp);
-                return *sp;
-            case OPEN:
-                break;
-            case READ:
-                break;
-            case CLOS:
-                break;
-            case PRTF:
-                break;
-            case MALC:
-                break;
-            case MSET:
-                break;
-            case MCMP:
-                break;
-            default:
-                printf("unknown op %d", op);
-                return -1;
+        if (op == IMM) {
+            ax = *pc++;
+        } else if (op == LI) {
+            ax = *(int *) ax;
+        } else if (op == LC) {
+            ax = *(char *) ax;
+        } else if (op == SI) {
+            *(int *) *sp++ = ax;
+        } else if (op == SC) {
+            *(char *) *sp++ = (char) ax;
+        } else if (op == PUSH) {
+            *--sp = ax;
+        } else if (op == JMP) {
+            pc = (int *) *pc;
+        } else if (op == JZ) {
+            pc = ax ? pc + 1 : (int *) *pc;
+        } else if (op == JNZ) {
+            pc = ax ? (int *) *pc : pc + 1;
+        } else if (op == CALL) {
+            *--sp = (int) (pc + 1);
+            pc = (int *) *pc;
+        } else if (op == ENT) {
+            *--sp = (int) bp;
+            bp = sp;
+            sp -= *pc++;
+        } else if (op == LEV) {
+            sp = bp;
+            bp = (int *) *sp++;
+            pc = (int *) *sp++;
+        } else if (op == ADJ) {
+            sp += *pc++;
+        } else if (op == LEA) {
+            ax = (int) (bp + *pc++);
+        } else if (op == XOR) {
+            ax = *sp++ ^ ax;
+        } else if (op == OR) {
+            ax = *sp++ | ax;
+        } else if (op == AND) {
+            ax = *sp++ & ax;
+        } else if (op == EQ) {
+            ax = *sp++ == ax;
+        } else if (op == NE) {
+            ax = *sp++ != ax;
+        } else if (op == LT) {
+            ax = *sp++ < ax;
+        } else if (op == LE) {
+            ax = *sp++ <= ax;
+        } else if (op == GT) {
+            ax = *sp++ > ax;
+        } else if (op == GE) {
+            ax = *sp++ >= ax;
+        } else if (op == SHL) {
+            ax = *sp++ << ax;
+        } else if (op == SHR) {
+            ax = *sp++ >> ax;
+        } else if (op == ADD) {
+            ax = *sp++ + ax;
+        } else if (op == SUB) {
+            ax = *sp++ - ax;
+        } else if (op == MUL) {
+            ax = *sp++ * ax;
+        } else if (op == DIV) {
+            ax = *sp++ / ax;
+        } else if (op == MOD) {
+            ax = *sp++ % ax;
+        } else if (op == EXIT) {
+            printf("exit %d", *sp);
+            return *sp;
+        } else if (op == OPEN) {
+        } else if (op == READ) {
+        } else if (op == CLOS) {
+        } else if (op == PRTF) {
+        } else if (op == MALC) {
+        } else if (op == MSET) {
+        } else if (op == MCMP) {
+        } else {
+            printf("unknown op %d", op);
+            return -1;
         }
     }
 }
