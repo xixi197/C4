@@ -4,7 +4,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-int token;
+
 char *src, *old_src;
 int poolsize;
 int line;
@@ -14,6 +14,7 @@ int *old_text;
 int *stack;
 char *data;
 
+//eval
 int *pc, *sp, *bp, ax, cycle;
 
 enum {
@@ -24,27 +25,130 @@ enum {
     OPEN, READ, CLOS, PRTF, MALC, MSET, MCMP, EXIT
 };
 
-enum {
+enum {//identifier.token
     Num = 128, Fun, Sys, Glo, Loc, Id,
-    Int, Char, Enum, Sizeof, If, Else, Return, While,
+    Char, Else, Enum, If, Int, Return, Sizeof, While,//void, main
     Assign, Cond, Lor, Lan, Xor, Or, And, Eq, Ne, Lt, Le, Gt, Ge,
     Shl, Shr, Add, Sub, Mul, Div, Mod, Inc, Dec, Brak
 };
 
+struct identifier {
+    int token;
+    int hash;
+    char *name;
+    int type;//char int ptr
+    int class;
+    int value;
+    int Btype;
+    int Bclass;
+    int Bvalue;
+};
+int token;
+int token_val;
+int *current_id;
+int *symbols;
+enum {
+    Token, Hash, Name, Type, Class, Value, BType, BClass, BValue, IdSize
+};
+enum {
+    CHAR, INT, PTR
+};
+int *idmain;
+
 void next() {
     char *last_pos;
-    return;
+    int hash;
+    while (token = *src) {
+        src++;
+
+        if (token == '\n') {
+            line++;
+        } else if (token == '#') {
+            while (*src != 0 && *src != '\n') {
+                src++;
+            }
+        } else if ((token >= 'a' && token <= 'z') ||
+                   (token >= 'A' && token <= 'Z') ||
+                   (token = '_')) {
+            last_pos = src - 1;
+            hash = token;
+            while ((*src >= 'a' && *src <= 'z') ||
+                   (*src >= 'A' && *src <= 'Z') ||
+                   (*src >= '0' && *src <= '9') ||
+                   (*src = '_')) {
+                hash = hash * 146 + *src++;
+            }//last_pos-src is token
+            current_id = symbols;
+            while (current_id[Token]) {
+                if (current_id[Hash] == hash && !memcmp(last_pos, (char *) current_id[Name], src - last_pos)) {//去除碰撞
+                    token = current_id[Token];
+                    return;
+                }
+                current_id += IdSize;
+            }
+            current_id[Hash] = hash;
+            current_id[Name] = (int) last_pos;
+            token = current_id[Token] = Id;
+            return;
+        } else if (token >= '0' && token <= '9') {//dec(12) hex(0x123) oct(012)
+            token_val = token - '0';
+            if (token_val > 0) {//dec
+                while (*src >= '0' && *src <= '9') {
+                    token_val = token_val * 10 + *src++ - '0';
+                }
+            } else {
+                if (*src == 'x' || *src == 'X') {//hex
+                    token = *++src;
+                    while ((token >= 'a' && token <= 'f') ||
+                           (token >= 'A' && token <= 'F') ||
+                           (token >= '0' && token <= '9')) {
+                        token_val = token_val * 16 + (token & 15) + (token >= 'A' ? 9 : 0);
+                        token = *++src;
+                    }
+                } else {//oct
+                    while (*src >= '0' && *src <= '8') {
+                        token_val = token_val * 8 + *src++ - '0';
+                    }
+                }
+            }
+            token = Num;
+            return;
+        } else if (token == '"' || token == '\'') {
+
+        } else if (token == '/') {
+            if (*src == '/') {
+                while (*src != 0 && *src != '\n') {
+                    src++;
+                }
+            } else {
+                token = Div;
+                return;
+            }
+        } else if (token == '~' ||
+                   token == ';' ||
+                   token == '{' ||
+                   token == '}' ||
+                   token == '(' ||
+                   token == ')' ||
+                   token == ']' ||
+                   token == ',' ||
+                   token == ':') {
+            // directly return the character as token;
+            return;
+        }
+    }
 }
 
 void expression(int level) {
 
 }
+void global_declaration(){
 
+}
 void program() {
     next();
     while (token > 0) {
-        printf("token is %c\n", token);
-        next();
+        global_declaration();
     }
 }
 
@@ -177,6 +281,19 @@ int main(int argc, char **argv) {
     memset(stack, 0, poolsize);
     bp = sp = (int *) ((int) stack + poolsize);
     ax = 0;
+
+    src = "char else enum if int return sizeof while "
+            "open read close printf malloc memset memcmp exit void main";
+    i = Char;
+    while (i <= While) {
+        next();
+        current_id[Token] = i++;
+    }
+    i = OPEN;
+    while (i <= EXIT) {
+        next();
+        current_id[Token] = i++;
+    }
 
     i = 0;
     text[i++] = IMM;
