@@ -17,18 +17,20 @@ char *data;
 //eval
 int *pc, *sp, *bp, ax, cycle;
 
+// opcodes
 enum {
-    IMM, LI, LC, SI, SC, PUSH, JMP, JZ, JNZ,
-    CALL, ENT, LEV, ADJ, LEA,
+    LEA, IMM, JMP, JZ, JNZ,
+    CALL, ENT, ADJ, LEV,
+    LI, LC, SI, SC, PUSH,
     XOR, OR, AND, EQ, NE, LT, LE, GT, GE,
     SHL, SHR, ADD, SUB, MUL, DIV, MOD,
     OPEN, READ, CLOS, PRTF, MALC, MSET, MCMP, EXIT
 };
 
 enum {//identifier.token
-    Num = 128, Fun, Sys, Glo, Loc, Id,
-    Char, Else, Enum, If, Int, Return, Sizeof, While,//void, main
-    Assign, Cond, Lor, Lan, Xor, Or, And, Eq, Ne, Lt, Le, Gt, Ge,
+    Num = 128, Fun, Sys, Glo, Loc, Id,//类型
+    Char, Else, Enum, If, Int, Return, Sizeof, While,//void, main 关键字 本身都是字符串
+    Assign, Cond, Lor, Lan, Xor, Or, And, Eq, Ne, Lt, Le, Gt, Ge,//操作符
     Shl, Shr, Add, Sub, Mul, Div, Mod, Inc, Dec, Brak
 };
 
@@ -43,7 +45,7 @@ struct identifier {
     int Bclass;
     int Bvalue;
 };
-int token;
+int token;//当前的token，从identifier.token代表或者第一个字符
 int token_val;
 int *current_id;
 int *symbols;
@@ -69,13 +71,13 @@ void next() {
             }
         } else if ((token >= 'a' && token <= 'z') ||
                    (token >= 'A' && token <= 'Z') ||
-                   (token = '_')) {
+                   (token == '_')) {
             last_pos = src - 1;
             hash = token;
             while ((*src >= 'a' && *src <= 'z') ||
                    (*src >= 'A' && *src <= 'Z') ||
                    (*src >= '0' && *src <= '9') ||
-                   (*src = '_')) {
+                   (*src == '_')) {
                 hash = hash * 146 + *src++;
             }//last_pos-src is token
             current_id = symbols;
@@ -86,9 +88,9 @@ void next() {
                 }
                 current_id += IdSize;
             }
+            token = current_id[Token] = Id;
             current_id[Hash] = hash;
             current_id[Name] = (int) last_pos;
-            token = current_id[Token] = Id;
             return;
         } else if (token >= '0' && token <= '9') {//dec(12) hex(0x123) oct(012)
             token_val = token - '0';
@@ -114,7 +116,26 @@ void next() {
             token = Num;
             return;
         } else if (token == '"' || token == '\'') {
-
+            last_pos = data;
+            while (*src != 0 && *src != token) {
+                token_val = *src++;
+                if (token_val == '\\') {
+                    token_val = *src++;
+                    if (token_val == 'n') {
+                        token_val = '\n';
+                    }
+                }
+                if (token == '"') {
+                    *data++ = (char) token_val;
+                }
+            }
+            src++;//跳过最后一个符号
+            if (token == '"') {
+                token_val = (int) last_pos;
+            } else {
+                token = Num;
+            }
+            return;
         } else if (token == '/') {
             if (*src == '/') {
                 while (*src != 0 && *src != '\n') {
@@ -124,6 +145,95 @@ void next() {
                 token = Div;
                 return;
             }
+//            , Cond, Lor, Lan, Xor, Or, And, , , Lt, Le, Gt, Ge,//操作符
+//                    Shl, Shr, , , Mul, Mod, , , Brak
+        } else if (token == '=') {
+            if (*src == '=') {
+                src++;
+                token = Eq;
+            } else {
+                token = Assign;
+            }
+            return;
+        } else if (token == '+') {
+            if (*src == '+') {
+                src++;
+                token = Inc;
+            } else {
+                token = Add;
+            }
+            return;
+        } else if (token == '-') {
+            if (*src == '-') {
+                src++;
+                token = Dec;
+            } else {
+                token = Sub;
+            }
+            return;
+        } else if (token == '!') {
+            if (*src == '=') {
+                src++;
+                token = Ne;
+            }
+            return;
+        } else if (token == '<') {
+            // parse '<=', '<<' or '<'
+            if (*src == '=') {
+                src++;
+                token = Le;
+            } else if (*src == '<') {
+                src++;
+                token = Shl;
+            } else {
+                token = Lt;
+            }
+            return;
+        } else if (token == '>') {
+            // parse '>=', '>>' or '>'
+            if (*src == '=') {
+                src++;
+                token = Ge;
+            } else if (*src == '>') {
+                src++;
+                token = Shr;
+            } else {
+                token = Gt;
+            }
+            return;
+        } else if (token == '|') {
+            // parse '|' or '||'
+            if (*src == '|') {
+                src++;
+                token = Lor;
+            } else {
+                token = Or;
+            }
+            return;
+        } else if (token == '&') {
+            // parse '&' and '&&'
+            if (*src == '&') {
+                src++;
+                token = Lan;
+            } else {
+                token = And;
+            }
+            return;
+        } else if (token == '^') {
+            token = Xor;
+            return;
+        } else if (token == '%') {
+            token = Mod;
+            return;
+        } else if (token == '*') {
+            token = Mul;
+            return;
+        } else if (token == '[') {
+            token = Brak;
+            return;
+        } else if (token == '?') {
+            token = Cond;
+            return;
         } else if (token == '~' ||
                    token == ';' ||
                    token == '{' ||
@@ -137,14 +247,17 @@ void next() {
             return;
         }
     }
+
 }
 
 void expression(int level) {
 
 }
-void global_declaration(){
+
+void global_declaration() {
 
 }
+
 void program() {
     next();
     while (token > 0) {
@@ -157,18 +270,10 @@ int eval() {
     while (1) {
         op = *pc++;
 
-        if (op == IMM) {
+        if (op == LEA) {
+            ax = (int) (bp + *pc++);
+        } else if (op == IMM) {
             ax = *pc++;
-        } else if (op == LI) {
-            ax = *(int *) ax;
-        } else if (op == LC) {
-            ax = *(char *) ax;
-        } else if (op == SI) {
-            *(int *) *sp++ = ax;
-        } else if (op == SC) {
-            *(char *) *sp++ = (char) ax;
-        } else if (op == PUSH) {
-            *--sp = ax;
         } else if (op == JMP) {
             pc = (int *) *pc;
         } else if (op == JZ) {
@@ -182,15 +287,25 @@ int eval() {
             *--sp = (int) bp;
             bp = sp;
             sp -= *pc++;
+        } else if (op == ADJ) {
+            sp += *pc++;
         } else if (op == LEV) {
             sp = bp;
             bp = (int *) *sp++;
             pc = (int *) *sp++;
-        } else if (op == ADJ) {
-            sp += *pc++;
-        } else if (op == LEA) {
-            ax = (int) (bp + *pc++);
-        } else if (op == XOR) {
+        } else //无需pc参数
+        if (op == LI) {
+            ax = *(int *) ax;
+        } else if (op == LC) {
+            ax = *(char *) ax;
+        } else if (op == SI) {
+            *(int *) *sp++ = ax;
+        } else if (op == SC) {
+            *(char *) *sp++ = (char) ax;
+        } else if (op == PUSH) {
+            *--sp = ax;
+        } else // 二元
+        if (op == XOR) {
             ax = *sp++ ^ ax;
         } else if (op == OR) {
             ax = *sp++ | ax;
@@ -223,15 +338,23 @@ int eval() {
         } else if (op == MOD) {
             ax = *sp++ % ax;
         } else if (op == EXIT) {
-            printf("exit %d", *sp);
+            printf("exit (%d)", *sp);
             return *sp;
         } else if (op == OPEN) {
+            ax = open((char *) *(sp + 1), *sp);
         } else if (op == READ) {
+            ax = read(*(sp + 2), (void *) *(sp + 1), *sp);
         } else if (op == CLOS) {
-        } else if (op == PRTF) {
+            ax = close(*sp);
+        } else if (op == PRTF) {//?
+            tmp = sp + pc[1];
+            ax = printf((char *) tmp[-1], tmp[-2], tmp[-3], tmp[-4], tmp[-5], tmp[-6]);
         } else if (op == MALC) {
+            ax = (int) malloc(*sp);
         } else if (op == MSET) {
+            ax = (int) memset((void *) *(sp + 2), *(sp + 1), *sp);
         } else if (op == MCMP) {
+            ax = memcmp((void *) *(sp + 2), (void *) *(sp + 1), *sp);
         } else {
             printf("unknown op %d", op);
             return -1;
@@ -272,13 +395,17 @@ int main(int argc, char **argv) {
         printf("malloc data error");
         return -1;
     }
+    if (!(symbols = malloc(poolsize))) {
+        printf("malloc symbols error");
+        return -1;
+    }
     if (!(stack = malloc(poolsize))) {
         printf("malloc stack error");
         return -1;
     }
     memset(text, 0, poolsize);
     memset(data, 0, poolsize);
-    memset(stack, 0, poolsize);
+    memset(symbols, 0, poolsize);
     bp = sp = (int *) ((int) stack + poolsize);
     ax = 0;
 
@@ -289,11 +416,17 @@ int main(int argc, char **argv) {
         next();
         current_id[Token] = i++;
     }
-    i = OPEN;
+    i = OPEN;//func
     while (i <= EXIT) {
         next();
-        current_id[Token] = i++;
+        current_id[Class] = Sys;
+        current_id[Type] = INT;
+        current_id[Value] = i++;
     }
+    next();
+    current_id[Token] = Char;
+    next();
+    idmain = current_id;
 
     i = 0;
     text[i++] = IMM;
