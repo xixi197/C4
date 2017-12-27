@@ -145,8 +145,6 @@ void next() {
                 token = Div;
                 return;
             }
-//            , Cond, Lor, Lan, Xor, Or, And, , , Lt, Le, Gt, Ge,//操作符
-//                    Shl, Shr, , , Mul, Mod, , , Brak
         } else if (token == '=') {
             if (*src == '=') {
                 src++;
@@ -250,12 +248,356 @@ void next() {
 
 }
 
+void match(int t) {//常量
+    if (token == t) {
+        next();
+    } else {
+        printf("expect %c, got %c", t, token);
+        exit(-1);
+    }
+}
+
+int expr();
+
+int factor() {
+    int value = 0;
+    if (token == '(') {
+        match('(');
+        value = expr();
+        match(')');
+    } else {
+        value = token_val;
+        match(Num);
+    }
+    return value;
+}
+
+int term_tail(int lvalue) {
+    if (token == Mul) {
+        match('*');
+        int value = lvalue * factor();
+        return term_tail(value);
+    } else if (token == Div) {
+        match('/');
+        int value = lvalue / factor();
+        return term_tail(value);
+    } else {
+        return lvalue;
+    }
+}
+
+int term() {
+    int lvalue = factor();
+    return term_tail(lvalue);
+}
+
+int expr_tail(int lvalue) {
+    if (token == Add) {
+        match('+');
+        int value = lvalue + term();
+        return expr_tail(value);
+    } else if (token == Sub) {
+        match('-');
+        int value = lvalue - term();
+        return expr_tail(value);
+    } else {
+        return lvalue;
+    }
+}
+
+int expr() {
+    int lvalue = term();
+    return expr_tail(lvalue);
+}
+
 void expression(int level) {
 
 }
 
-void global_declaration() {
+//program ::= {global_declaration}+
+//
+//global_declaration ::= enum_decl | variable_decl | function_decl
+//
+//enum_decl ::= 'enum' [id] '{' id ['=' 'num'] {',' id ['=' 'num'] '}'
+//
+//variable_decl ::= type {'*'} id { ',' {'*'} id } ';'
+//
+//function_decl ::= type {'*'} id '(' parameter_decl ')' '{' body_decl '}'
+//
+//parameter_decl ::= type {'*'} id {',' type {'*'} id}
+//
+//body_decl ::= {variable_decl}, {statement}
+//
+//statement ::= non_empty_statement | empty_statement
+//
+//non_empty_statement ::= if_statement | while_statement | '{' statement '}'
+//| 'return' expression | expression ';'
+//
+//if_statement ::= 'if' '(' expression ')' statement ['else' non_empty_statement]
+//
+//while_statement ::= 'while' '(' expression ')' non_empty_statement
+void statement();
 
+void variable_decl();
+
+void if_statement() {
+    match(If);
+    match('(');
+    expression(Assign);
+    match(')');
+
+    *++text = JZ;
+    int *b = ++text;
+    statement();
+    if (token == Else) {
+        next();
+
+        *b = (int) text + 3;//text + 1 jmp, +2, b, + 3
+        *++text = JMP;
+        b = ++text;
+
+        statement();
+    }
+    *b = (int) (text + 1);
+}
+
+void while_statement() {
+    match(While);
+    int *a = text + 1;
+    expression(Assign);
+    *++text = JZ;
+    int *b = ++text;
+    statement();
+    *++text = JMP;
+    *++text = (int) a;
+    *b = (int) (text + 1);
+}
+
+
+void statement() {
+    if (token == If) {
+        if_statement();
+    } else if (token == While) {
+        while_statement();
+    } else if (token == Return) {
+        next();
+        if (token != ';') {
+            expression(Assign);
+        }
+        next();
+        *++text = LEV;
+    } else if (token == '{') {
+        // { <statement> ... }
+        next();
+
+        while (token != '}') {
+            statement();
+        }
+
+        next();
+    } else if (token == ';') {
+        // empty statement
+        next();
+    } else {//常规语句
+        // a = b; or function_call();
+        expression(Assign);
+        match(';');
+    }
+}
+
+int index_of_bp;
+
+void parameter_decl() {
+//    type {'*'} id {',' type {'*'} id}
+    int type;
+    int params;
+    params = 0;
+    while (token != ')') {
+        type = Int;
+        if (token == Int) {
+            next();
+        } else if (token == Char) {
+            type = CHAR;
+            next();
+        } else {
+            exit(1);
+        }
+        while (token == Mul) {
+            next();
+            type += PTR;
+        }
+
+        if (token != Id) {
+            exit(-1);
+        }
+        if (current_id[Class] == Loc) {
+            exit(-1);//重复
+        }
+        match(Id);
+
+        //property
+        current_id[BClass] = current_id[Class];
+        current_id[Class] = Loc;
+        current_id[BType] = current_id[Type];
+        current_id[Type] = type;
+        current_id[BValue] = current_id[Value];
+        current_id[Value] = params++;//index
+
+        if (token == ',') {
+            next();
+        }
+    }
+    index_of_bp = params + 1;//bp的位置
+}
+
+int basetype;
+int expr_type;
+
+void body_decl() {
+    int pos_local;
+    int type;
+    pos_local = index_of_bp;
+    while (token == Int || token == Char) {
+        basetype = (token == Int) ? INT : CHAR;
+        next();
+        while (token != ';') {
+            type = basetype;
+            while (token == Mul) {
+                next();
+                type += PTR;
+            }
+//        type {'*'} id { ',' {'*'} id } ';'
+//        type {'*'} id '(' parameter_decl ')' '{' body_decl '}'
+
+
+            //id的属性
+            if (token != Id) {
+                exit(-1);
+            }
+            if (current_id[Class] == Loc) {
+                exit(-1);//重复
+            }
+            match(Id);
+
+            //property
+            current_id[BClass] = current_id[Class];
+            current_id[Class] = Loc;
+            current_id[BType] = current_id[Type];
+            current_id[Type] = type;
+            current_id[BValue] = current_id[Value];
+            current_id[Value] = ++pos_local;//index
+
+            if (token == ',') {
+                next();
+            }
+        }
+        next();
+    }
+
+    *++text = ENT;
+    *++text = pos_local - index_of_bp;
+    while (token != '}') {
+        statement();
+    }
+    *++text = LEV;
+}
+
+void enum_decl() {
+    int i;
+    i = 0;
+    while (token != '}') {
+        if (token != Id) {
+            exit(1);
+        }
+        next();
+        if (token == Assign) {
+            next();
+            if (token != Num) {
+                exit(-1);
+            }
+            i = token_val;
+            next();
+        }
+        current_id[Class] = Num;
+        current_id[Type] = Int;
+        current_id[Value] = i++;
+        if (token == ',') { next(); }
+    }
+}
+
+
+void function_decl() {
+//function_decl ::= type {'*'} id '(' parameter_decl ')' '{' body_decl '}'
+    match('(');
+    parameter_decl();
+    match(')');
+    match('{');
+    body_decl();
+    current_id = symbols;
+    while (current_id[Token]) {
+        if (current_id[Class] == Loc) {
+            current_id[Class] = current_id[BClass];
+            current_id[Type] = current_id[BType];
+            current_id[Value] = current_id[BValue];
+        }
+        current_id += IdSize;
+    }
+}
+
+
+void global_declaration() {
+    int type;
+    int i;
+    basetype = INT;
+    if (token == Enum) {
+//        enum_decl ::= 'enum' [id] '{' id ['=' 'num'] {',' id ['=' 'num'] '}'
+        next();
+        if (token != '{') {
+            match(Id);
+        }
+        if (token == '{') {
+            next();
+            enum_decl();
+            match('}');
+        }
+        match(';');
+        return;
+    }
+    if (token == Int) {
+        next();
+    } else if (token == Char) {//void?
+        next();
+        basetype = CHAR;
+    }
+
+    while (token != ';' && token != '}') {
+        type = basetype;
+        while (token == Mul) {
+            next();
+            type += PTR;
+        }
+//        type {'*'} id { ',' {'*'} id } ';'
+//        type {'*'} id '(' parameter_decl ')' '{' body_decl '}'
+
+
+        //id的属性
+        match(Id);
+        current_id[Type] = type;
+
+        if (token == '(') {
+            current_id[Class] = Fun;
+            current_id[Value] = (int) (text + 1);//??
+            function_decl();
+        } else {
+            current_id[Class] = Glo;
+            current_id[Value] = (int) data;
+            data = data + sizeof(int);//?
+        }
+        if (token == ',') {
+            next();
+        }
+    }
+    next();
 }
 
 void program() {
