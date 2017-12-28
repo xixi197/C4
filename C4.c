@@ -310,7 +310,131 @@ int expr() {
     return expr_tail(lvalue);
 }
 
-void expression(int level) {
+int expr_type;
+
+int index_of_bp;
+
+void expression(int level) {//解析表达式
+    int tmp;
+    int *id = current_id;
+    int addr;
+    if (token == Num) {
+        *++text = IMM;
+        *++text = token_val;
+        expr_type = Int;
+    } else if (token == '"') {
+        *++text = IMM;
+        *++text = token_val;
+        next();
+        while (token == '"') {
+            next();
+        }
+
+        data = (char *) (((int) data + sizeof(int)) & (-sizeof(int)));//内存对齐
+        expr_type = PTR;
+    } else if (token == Sizeof) {
+        next();
+        match('(');
+        expr_type = INT;
+        if (token == Int) {
+            next();
+        } else if (token == Char) {
+            next();
+            expr_type = Char;
+        }
+        while (token == Mul) {
+            next();
+            expr_type += PTR;
+        }
+        match(')');
+        *++text = IMM;
+        *++text = (expr_type == CHAR) ? sizeof(char) : sizeof(int);
+        expr_type = INT;
+    } else if (token == Id) {
+        //func()
+        //id
+        //enum
+        next();
+
+        if (token == '(') {
+            //func()
+            tmp = 0;
+            while (token != ')') {
+                expression(Assign);
+                *--text = PUSH;
+                tmp++;
+                if (token == ',')next();
+            }
+            next();
+            if (id[Class] == Sys) {
+                *--text = id[Value];
+            } else if (id[Class] == Fun) {
+                *--text = CALL;
+                *--text = id[Value];
+            } else {
+                exit(-1);
+            }
+            if (tmp > 0) {
+                *--text = ADJ;
+                *--text = tmp;
+            }
+            expr_type = id[Type];
+        } else if (id[Class] == Num) { //enum
+            *--text = IMM;
+            *--text = id[Value];
+            expr_type = INT;
+        } else {
+            if (id[Class] == Glo) {
+                *--text = IMM;
+                *--text = id[Value];
+            } else if (id[Class] == Loc) {
+                *--text = LEA;
+                *text = index_of_bp - id[Value];
+            } else {
+                exit(-1);
+            }
+            expr_type = id[Type];
+            *--text = (expr_type == Char) ? LC : LI;
+        }
+    } else if (token == '(') {
+        next();
+        if (token == Int || token == Char) {
+            tmp = (token == Int) ? INT : CHAR;
+            while (token == MUL) {
+                tmp += PTR;
+            }
+            match(')');
+            expression(Inc);
+            expr_type = tmp;
+        } else {
+            expression(Assign);
+            match(')');
+        }
+
+    } else if (token == Mul) {//*P
+
+    } else if (token == And) {
+
+    } else if (token == '!') {
+
+    } else if (token == '~') {
+
+    } else if (token == Add) {
+
+    } else if (token == Sub) {
+
+    } else if (token == Inc) {
+
+    } else if (token == Dec) {
+
+    }
+
+    while (token >= level) {
+        tmp = expr_type;
+        if(token == Assign) {
+
+        } else if (token == Cond)
+    }
 
 }
 
@@ -405,7 +529,6 @@ void statement() {
     }
 }
 
-int index_of_bp;
 
 void parameter_decl() {
 //    type {'*'} id {',' type {'*'} id}
@@ -451,7 +574,7 @@ void parameter_decl() {
 }
 
 int basetype;
-int expr_type;
+
 
 void body_decl() {
     int pos_local;
